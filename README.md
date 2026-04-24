@@ -1,4 +1,4 @@
-# Site Acquisition Tracker
+# AMInvest Site Tracker
 
 Internal web application for tracking live property acquisition targets through a structured, site-first workflow.
 
