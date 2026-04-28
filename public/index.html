@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Site Acquisition Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <style>
+    /* ---- Reset & tokens ---- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --md-primary: #006a6a;
+      --md-on-primary: #ffffff;
+      --md-surface: #f5f5f5;
+      --md-surface-container: #ffffff;
+      --md-on-surface: #1c1b1f;
+      --md-on-surface-variant: #49454f;
+      --md-outline: #79747e;
+      --md-outline-variant: #cac4d0;
+      --md-error: #ba1a1a;
+      --md-radius: 12px;
+      --spine-terence: #ba1a1a;
+      --spine-allana: #006a6a;
+      --font: 'Ubuntu', sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--md-surface);
+      color: var(--md-on-surface);
+      min-height: 100vh;
+    }
+
+    /* ---- Top bar ---- */
+    .topbar {
+      background: var(--md-primary);
+      color: var(--md-on-primary);
+      padding: 0 24px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar h1 { font-size: 1.125rem; font-weight: 500; }
+    .topbar-actions { display: flex; align-items: center; gap: 12px; }
+    .topbar-actions span { font-size: .875rem; opacity: .9; }
+
+    .btn {
+      font-family: var(--font);
+      font-size: .8125rem;
+      font-weight: 500;
+      padding: 8px 20px;
+      border: none;
+      border-radius: 24px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .15s;
+    }
+    .btn-filled {
+      background: var(--md-on-primary);
+      color: var(--md-primary);
+    }
+    .btn-filled:hover { background: #e0e0e0; }
+    .btn-tonal {
+      background: rgba(255,255,255,.15);
+      color: var(--md-on-primary);
+    }
+    .btn-tonal:hover { background: rgba(255,255,255,.25); }
+    .btn-outline {
+      background: transparent;
+      color: var(--md-primary);
+      border: 1px solid var(--md-outline);
+    }
+    .btn-outline:hover { background: rgba(0,106,106,.08); }
+    .btn-error {
+      background: var(--md-error);
+      color: #fff;
+    }
+    .btn-error:hover { background: #93000a; }
+    .btn-text {
+      background: transparent;
+      color: var(--md-primary);
+    }
+
+    /* ---- Board ---- */
+    .board {
+      display: flex;
+      gap: 12px;
+      padding: 16px;
+      overflow-x: auto;
+      min-height: calc(100vh - 64px);
+      align-items: flex-start;
+    }
+
+    .column {
+      min-width: 260px;
+      max-width: 300px;
+      flex: 1 0 260px;
+      background: var(--md-surface-container);
+      border-radius: var(--md-radius);
+      display: flex;
+      flex-direction: column;
+    }
+    .column-header {
+      padding: 14px 16px 10px;
+      font-size: .8125rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--md-on-surface-variant);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .column-header .count {
+      background: var(--md-outline-variant);
+      color: var(--md-on-surface-variant);
+      font-size: .75rem;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .column-body {
+      padding: 4px 8px 8px;
+      flex: 1;
+      min-height: 60px;
+    }
+    .column-body.drag-over {
+      background: rgba(0,106,106,.06);
+      border-radius: 0 0 var(--md-radius) var(--md-radius);
+    }
+
+    /* ---- Cards ---- */
+    .card {
+      background: #fff;
+      border-radius: var(--md-radius);
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
+      cursor: grab;
+      border-left: 4px solid transparent;
+      transition: box-shadow .15s;
+      position: relative;
+    }
+    .card:active { cursor: grabbing; }
+    .card.dragging { opacity: .5; }
+    .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+    .card[data-owner="terence"] { border-left-color: var(--spine-terence); }
+    .card[data-owner="allana"]  { border-left-color: var(--spine-allana); }
+
+    .card-title {
+      font-size: .875rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: var(--md-on-surface);
+    }
+    .card-meta {
+      font-size: .75rem;
+      color: var(--md-on-surface-variant);
+      line-height: 1.4;
+    }
+    .card-meta .label { font-weight: 500; }
+
+    /* ---- Modal / Dialog ---- */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.4);
+      z-index: 200;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+      overflow-y: auto;
+    }
+    .overlay.open { display: flex; }
+
+    .dialog {
+      background: var(--md-surface-container);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 680px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    }
+    .dialog h2 {
+      font-size: 1.125rem;
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 16px;
+    }
+    .form-grid .full { grid-column: 1 / -1; }
+
+    .field label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 500;
+      color: var(--md-on-surface-variant);
+      margin-bottom: 4px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--md-outline);
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: .875rem;
+      background: #fff;
+      color: var(--md-on-surface);
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: 2px solid var(--md-primary);
+      border-color: var(--md-primary);
+    }
+    .field textarea { resize: vertical; min-height: 60px; }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    /* ---- Detail panel ---- */
+    .detail-section { margin-bottom: 16px; }
+    .detail-section h3 {
+      font-size: .8125rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--md-on-surface-variant);
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--md-outline-variant);
+      padding-bottom: 4px;
+    }
+    .detail-row {
+      display: flex;
+      padding: 4px 0;
+      font-size: .875rem;
+    }
+    .detail-row .dl { font-weight: 500; min-width: 160px; color: var(--md-on-surface-variant); }
+    .detail-row .dd { flex: 1; color: var(--md-on-surface); word-break: break-word; }
+    .detail-row .dd a { color: var(--md-primary); }
+
+    .activity-item {
+      padding: 6px 0;
+      font-size: .8125rem;
+      color: var(--md-on-surface-variant);
+      border-bottom: 1px solid var(--md-outline-variant);
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-action { color: var(--md-on-surface); font-weight: 500; }
+
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #323232;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: .875rem;
+      z-index: 999;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,.3);
+    }
+    .toast.show { display: block; }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 768px) {
+      .board { padding: 8px; gap: 8px; }
+      .column { min-width: 220px; flex: 1 0 220px; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Site Acquisition Tracker</h1>
+  <div class="topbar-actions">
+    <span id="user-label"></span>
+    <button class="btn btn-filled" onclick="openNewSiteForm()">
+      <span class="material-icons-outlined" style="font-size:18px">add</span> New site
+    </button>
+    <a href="/logout" class="btn btn-tonal">Sign out</a>
+  </div>
+</div>
+
+<div class="board" id="board"></div>
+
+<!-- New / Edit Site Dialog -->
+<div class="overlay" id="site-dialog">
+  <div class="dialog">
+    <h2 id="dialog-title">New site</h2>
+    <form id="site-form" onsubmit="return saveSite(event)">
+      <input type="hidden" id="f-id">
+      <div class="form-grid">
+        <div class="field"><label>Site name *</label><input id="f-name" required></div>
+        <div class="field"><label>Stage</label>
+          <select id="f-stage">
+            <option>Review</option><option>Progress</option>
+            <option>Planning Thesis Ready</option><option>Ownership Checked</option>
+            <option>Ready for Contact</option><option>Contacted</option>
+            <option>Active Dialogue</option><option>Dead</option><option>Acquired</option>
+          </select>
+        </div>
+
+        <div class="field full"><label>Property address</label><input id="f-address"></div>
+        <div class="field"><label>Postcode</label><input id="f-postcode"></div>
+        <div class="field"><label>Local authority</label><input id="f-authority"></div>
+
+        <div class="field"><label>Site type</label>
+          <select id="f-site_type">
+            <option value="">—</option>
+            <option>Side plot</option><option>Corner plot</option>
+            <option>Large garden</option><option>Infill</option>
+            <option>Backland</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Location tier</label><input id="f-location_tier"></div>
+
+        <div class="field full"><label>Current use</label><input id="f-current_use"></div>
+        <div class="field full"><label>Why use is weakening</label><textarea id="f-why_use_weakening" rows="2"></textarea></div>
+        <div class="field full"><label>Physical positives</label><textarea id="f-physical_positives" rows="2"></textarea></div>
+        <div class="field full"><label>Physical risks</label><textarea id="f-physical_risks" rows="2"></textarea></div>
+
+        <div class="field full"><label>Planning thesis</label><textarea id="f-planning_thesis" rows="3"></textarea></div>
+        <div class="field full"><label>Planning notes</label><textarea id="f-planning_notes" rows="2"></textarea></div>
+
+        <div class="field"><label>Ownership type</label><input id="f-ownership_type"></div>
+        <div class="field"><label>Ownership traceability</label>
+          <select id="f-ownership_traceability">
+            <option>Unknown</option><option>Partial</option><option>Confirmed</option>
+          </select>
+        </div>
+        <div class="field"><label>Owner contacted</label>
+          <select id="f-owner_contacted">
+            <option>No</option><option>Yes</option>
+          </select>
+        </div>
+        <div class="field"><label>Owner</label>
+          <select id="f-owner">
+            <option value="terence">terence</option>
+            <option value="allana">allana</option>
+          </select>
+        </div>
+
+        <div class="field full"><label>Next step</label><input id="f-next_step"></div>
+        <div class="field"><label>Last action date</label><input id="f-last_action_date" type="date"></div>
+
+        <div class="field"><label>Maps link</label><input id="f-maps_link" type="url"></div>
+        <div class="field"><label>Source link</label><input id="f-source_link" type="url"></div>
+
+        <div class="field"><label>External share status</label>
+          <select id="f-external_share_status">
+            <option>Not shared</option><option>Shared externally</option><option>Updated since sharing</option>
+          </select>
+        </div>
+        <div class="field"><label>Shared with</label><input id="f-shared_with"></div>
+        <div class="field"><label>Shared date</label><input id="f-shared_date" type="date"></div>
+
+        <div class="field full"><label>External summary</label><textarea id="f-external_summary" rows="2"></textarea></div>
+        <div class="field full"><label>Internal working notes</label><textarea id="f-notes" rows="3"></textarea></div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-text" onclick="closeDialog()">Cancel</button>
+        <button type="submit" class="btn btn-filled" style="background:var(--md-primary);color:#fff;">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Detail Dialog -->
+<div class="overlay" id="detail-dialog">
+  <div class="dialog" style="max-width:720px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 id="detail-title" style="margin:0"></h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="editFromDetail()">
+          <span class="material-icons-outlined" style="font-size:16px">edit</span> Edit
+        </button>
+        <button class="btn btn-error" onclick="deleteFromDetail()">
+          <span class="material-icons-outlined" style="font-size:16px">delete</span>
+        </button>
+        <button class="btn btn-text" onclick="closeDetail()">Close</button>
+      </div>
+    </div>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ---- State ----
+  const STAGES = [
+    'Review','Progress','Planning Thesis Ready','Ownership Checked',
+    'Ready for Contact','Contacted','Active Dialogue','Dead','Acquired'
+  ];
+  let sites = [];
+  let currentUser = null;
+  let detailSiteId = null;
+
+  // ---- Init ----
+  async function init() {
+    const me = await api('/api/me');
+    currentUser = me;
+    document.getElementById('user-label').textContent = me.username;
+    document.getElementById('f-owner').value = me.username;
+    buildBoard();
+    await loadSites();
+  }
+
+  // ---- API helper ----
+  async function api(url, opts) {
+    const res = await fetch(url, opts);
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  // ---- Board ----
+  function buildBoard() {
+    const board = document.getElementById('board');
+    board.innerHTML = '';
+    STAGES.forEach(stage => {
+      const col = document.createElement('div');
+      col.className = 'column';
+      col.innerHTML = `
+        <div class="column-header">
+          <span>${stage}</span>
+          <span class="count" data-stage-count="${stage}">0</span>
+        </div>
+        <div class="column-body" data-stage="${stage}"></div>`;
+      board.appendChild(col);
+
+      const body = col.querySelector('.column-body');
+      body.addEventListener('dragover', e => { e.preventDefault(); body.classList.add('drag-over'); });
+      body.addEventListener('dragleave', () => body.classList.remove('drag-over'));
+      body.addEventListener('drop', e => { e.preventDefault(); body.classList.remove('drag-over'); handleDrop(e, stage); });
+    });
+  }
+
+  async function loadSites() {
+    sites = await api('/api/sites');
+    renderCards();
+  }
+
+  function renderCards() {
+    // Clear all column bodies
+    document.querySelectorAll('.column-body').forEach(b => b.innerHTML = '');
+    // Reset counts
+    const counts = {};
+    STAGES.forEach(s => counts[s] = 0);
+
+    sites.forEach(site => {
+      counts[site.stage] = (counts[site.stage] || 0) + 1;
+      const body = document.querySelector(`.column-body[data-stage="${site.stage}"]`);
+      if (!body) return;
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.draggable = true;
+      card.dataset.id = site.id;
+      card.dataset.owner = (site.owner || '').toLowerCase();
+      card.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', site.id);
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+      card.addEventListener('click', () => openDetail(site.id));
+
+      const lastDate = site.last_action_date || '—';
+      card.innerHTML = `
+        <div class="card-title">${esc(site.name)}</div>
+        <div class="card-meta">
+          ${site.authority ? `<div>${esc(site.authority)}</div>` : (site.address ? `<div>${esc(site.address)}</div>` : '')}
+          ${site.next_step ? `<div><span class="label">Next:</span> ${esc(site.next_step)}</div>` : ''}
+          <div><span class="label">Last:</span> ${esc(lastDate)}</div>
+        </div>`;
+      body.appendChild(card);
+    });
+
+    // Update counts
+    STAGES.forEach(s => {
+      const el = document.querySelector(`[data-stage-count="${s}"]`);
+      if (el) el.textContent = counts[s] || 0;
+    });
+  }
+
+  async function handleDrop(e, newStage) {
+    const id = e.dataTransfer.getData('text/plain');
+    if (!id) return;
+    try {
+      await api(`/api/sites/${id}/stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newStage })
+      });
+      await loadSites();
+      toast('Stage updated');
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  // ---- New / Edit form ----
+  function openNewSiteForm() {
+    document.getElementById('dialog-title').textContent = 'New site';
+    document.getElementById('site-form').reset();
+    document.getElementById('f-id').value = '';
+    document.getElementById('f-stage').value = 'Review';
+    document.getElementById('f-owner').value = currentUser.username;
+    // Only allow Review or Progress for new sites
+    setStageOptions(true);
+    document.getElementById('site-dialog').classList.add('open');
+  }
+
+  function openEditForm(site) {
+    document.getElementById('dialog-title').textContent = 'Edit site';
+    document.getElementById('f-id').value = site.id;
+    setStageOptions(false);
+
+    const fields = [
+      'name','address','postcode','authority','site_type','current_use',
+      'why_use_weakening','physical_positives','physical_risks',
+      'location_tier','planning_thesis','planning_notes',
+      'ownership_type','ownership_traceability','owner_contacted',
+      'next_step','last_action_date','maps_link','source_link',
+      'external_share_status','shared_with','shared_date','external_summary',
+      'notes','stage','owner'
+    ];
+    fields.forEach(f => {
+      const el = document.getElementById('f-' + f);
+      if (el) el.value = site[f] || '';
+    });
+    document.getElementById('site-dialog').classList.add('open');
+  }
+
+  function setStageOptions(isNew) {
+    const sel = document.getElementById('f-stage');
+    sel.innerHTML = '';
+    const stages = isNew ? ['Review', 'Progress'] : STAGES;
+    stages.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s; o.textContent = s;
+      sel.appendChild(o);
+    });
+  }
+
+  function closeDialog() {
+    document.getElementById('site-dialog').classList.remove('open');
+  }
+
+  async function saveSite(e) {
+    e.preventDefault();
+    const id = document.getElementById('f-id').value;
+    const body = {};
+    const fields = [
+      'name','address','postcode','authority','site_type','current_use',
+      'why_use_weakening','physical_positives','physical_risks',
+      'location_tier','planning_thesis','planning_notes',
+      'ownership_type','ownership_traceability','owner_contacted',
+      'next_step','last_action_date','maps_link','source_link',
+      'external_share_status','shared_with','shared_date','external_summary',
+      'notes','stage','owner'
+    ];
+    fields.forEach(f => {
+      const el = document.getElementById('f-' + f);
+      if (el) body[f] = el.value;
+    });
+
+    try {
+      if (id) {
+        await api(`/api/sites/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        toast('Site updated');
+      } else {
+        await api('/api/sites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        toast('Site created');
+      }
+      closeDialog();
+      await loadSites();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  // ---- Detail view ----
+  async function openDetail(id) {
+    detailSiteId = id;
+    const site = sites.find(s => s.id === id);
+    if (!site) return;
+
+    document.getElementById('detail-title').textContent = site.name;
+
+    let activity = [];
+    try { activity = await api(`/api/sites/${id}/activity`); } catch(_) {}
+
+    const d = document.getElementById('detail-body');
+    d.innerHTML = `
+      <div class="detail-section">
+        <h3>Site information</h3>
+        ${detailRow('Stage', site.stage)}
+        ${detailRow('Owner', site.owner)}
+        ${detailRow('Property address', site.address)}
+        ${detailRow('Postcode', site.postcode)}
+        ${detailRow('Local authority', site.authority)}
+        ${detailRow('Site type', site.site_type)}
+        ${detailRow('Location tier', site.location_tier)}
+        ${detailRow('Current use', site.current_use)}
+        ${detailRow('Why use is weakening', site.why_use_weakening)}
+      </div>
+      <div class="detail-section">
+        <h3>Physical assessment</h3>
+        ${detailRow('Physical positives', site.physical_positives)}
+        ${detailRow('Physical risks', site.physical_risks)}
+      </div>
+      <div class="detail-section">
+        <h3>Planning</h3>
+        ${detailRow('Planning thesis', site.planning_thesis)}
+        ${detailRow('Planning notes', site.planning_notes)}
+      </div>
+      <div class="detail-section">
+        <h3>Ownership and contact</h3>
+        ${detailRow('Ownership type', site.ownership_type)}
+        ${detailRow('Ownership traceability', site.ownership_traceability)}
+        ${detailRow('Owner contacted', site.owner_contacted)}
+        ${detailRow('Next step', site.next_step)}
+        ${detailRow('Last action date', site.last_action_date)}
+      </div>
+      <div class="detail-section">
+        <h3>Links</h3>
+        ${detailRow('Maps link', site.maps_link ? `<a href="${esc(site.maps_link)}" target="_blank">${esc(site.maps_link)}</a>` : '—', true)}
+        ${detailRow('Source link', site.source_link ? `<a href="${esc(site.source_link)}" target="_blank">${esc(site.source_link)}</a>` : '—', true)}
+      </div>
+      <div class="detail-section">
+        <h3>External sharing</h3>
+        ${detailRow('Share status', site.external_share_status)}
+        ${detailRow('Shared with', site.shared_with)}
+        ${detailRow('Shared date', site.shared_date)}
+        ${detailRow('External summary', site.external_summary)}
+      </div>
+      <div class="detail-section">
+        <h3>Internal working notes</h3>
+        <div style="font-size:.875rem;white-space:pre-wrap;color:var(--md-on-surface);padding:4px 0;">${esc(site.notes || '—')}</div>
+      </div>
+      <div class="detail-section">
+        <h3>Audit</h3>
+        ${detailRow('Created by', site.created_by)}
+        ${detailRow('Created', site.created_at)}
+        ${detailRow('Updated by', site.updated_by)}
+        ${detailRow('Updated', site.updated_at)}
+      </div>
+      <div class="detail-section">
+        <h3>Activity history</h3>
+        ${activity.length ? activity.map(a => `
+          <div class="activity-item">
+            <span class="activity-action">${esc(a.action)}</span>
+            <span> — ${esc(a.performed_by || '')} at ${esc(a.created_at || '')}</span>
+          </div>`).join('') : '<div style="font-size:.875rem;color:var(--md-on-surface-variant)">No activity recorded yet.</div>'}
+      </div>`;
+
+    document.getElementById('detail-dialog').classList.add('open');
+  }
+
+  function detailRow(label, value, isHtml) {
+    const v = isHtml ? (value || '—') : esc(value || '—');
+    return `<div class="detail-row"><div class="dl">${label}</div><div class="dd">${v}</div></div>`;
+  }
+
+  function closeDetail() {
+    document.getElementById('detail-dialog').classList.remove('open');
+    detailSiteId = null;
+  }
+
+  function editFromDetail() {
+    const site = sites.find(s => s.id === detailSiteId);
+    if (!site) return;
+    closeDetail();
+    openEditForm(site);
+  }
+
+  async function deleteFromDetail() {
+    if (!confirm('Delete this site permanently?')) return;
+    try {
+      await api(`/api/sites/${detailSiteId}`, { method: 'DELETE' });
+      toast('Site deleted');
+      closeDetail();
+      await loadSites();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  // ---- Helpers ----
+  function esc(s) {
+    if (s == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+  }
+
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // ---- Boot ----
+  init();
+</script>
+</body>
+</html>
